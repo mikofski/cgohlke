@@ -1,0 +1,24 @@
+#! /usr/bin/sh
+
+python cgohlke.py "$@"
+
+if [[ $1 == "install" && -d ~/.cgohlke ]]
+then
+    for FILE in ~/.cgohlke/*.exe
+    do
+        # check if wheel already exists
+        WHEEL=${FILE:0:${#FILE}-4}.whl
+        if [[ ! -f ~/.cgohlke/${FILE:0:${#FILE}-4}.whl ]]
+        then
+        echo converting $FILE to wheel ...
+        wheel convert -v $FILE -d ~/.cgohlke
+        else
+            echo $WHEEL already exists
+        fi
+    done
+    for FILE in ~/.cgohlke/*.whl
+    do
+        echo installing $FILE ...
+        pip install $FILE
+    done
+fi

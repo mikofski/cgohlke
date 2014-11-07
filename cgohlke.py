@@ -7,8 +7,12 @@ import argparse
 import os
 import sys
 import platform
-from urllib import urlretrieve
 import pprint
+import logging
+
+# basic logging configuration
+LOG_FMT = '[%(levelname)s] (%(asctime)-10s) %(message)s'
+logging.basicConfig(level=logging.DEBUG, format=LOG_FMT)
 
 PATTERN = 'javascript:dl\(\[(?P<ml>\d+(?:,\d+)+)\], "(?P<mi>.+)"'
 CGOHLKE_URL = 'http://www.lfd.uci.edu/~gohlke/pythonlibs/'
@@ -19,6 +23,8 @@ WIN_AMD64 = 'win-amd64'
 WIN32 = 'win32'
 MACHINE = WIN_AMD64 if platform.machine() == 'AMD64' else WIN32
 
+if not os.path.exists(BUILD_DIR):
+    os.mkdir(BUILD_DIR)
 
 def decode_link(encoded_link):
     ml = [int(i) for i in encoded_link['ml'].split(',')]
@@ -43,10 +49,10 @@ def get_cgohlke_pkgs(cgohlke_url=CGOHLKE_URL):
         if grp and grp in index:
             pkgs[grp] = []
             #print 'group: %s' % grp
-            pkg = {}
             for subitem in item.parent.find_all('a'):
                 onclick_event = subitem.get('onclick')
                 if onclick_event:
+                    pkg = {}
                     group = subitem.parent.parent.parent.contents[0]['id']
                     #assert group == grp
                     fullname = subitem.string[:-4].replace(u'\u2011', '-')
@@ -56,12 +62,8 @@ def get_cgohlke_pkgs(cgohlke_url=CGOHLKE_URL):
                     name, version = name.rsplit('-', 1)
                     #print 'package: %s' % pkg['fullname']
                     pkg['name'] = name
-                    if version.endswith(WIN_AMD64):
-                        pkg['machine'] = WIN_AMD64
-                        pkg['version'] = version[:len(WIN_AMD64)]
-                    else:
-                        pkg['machine'] = WIN32
-                        pkg['version'] = version[:len(WIN32)]
+                    pkg['version'] = version
+                    pkg['machine'] = machine
                     pkg['pyversion'] = pyversion
                     encoded_link = re.match(PATTERN, onclick_event).groupdict()
                     pkg['link'] = decode_link(encoded_link)
@@ -78,13 +80,23 @@ def search(pkgs):
 
 
 def install(pkgs):
-    for pkg in pgks:
+    for pkg in pkgs:
         if pkg in PKGS:
-            pyvers = [(p['machine'], p['pyversion']) for p in pkg]
+            pyvers = [(p['machine'], p['pyversion']) for p in PKGS[pkg]]
+            logging.debug('packages:\n%s', pyvers)
             idx = pyvers.index((MACHINE, PYVERSION))
-            link = pkg[idx]['link']
-            filename, headers = urlretrieve(link, os.join(BUILD_DIR, link))
-    return filename, headers
+            link = CGOHLKE_URL + PKGS[pkg][idx]['link']
+            filename = PKGS[pkg][idx]['fullname'] + '.exe'
+            if os.path.exists(os.path.join(BUILD_DIR, filename)):
+                logging.debug('file already exists: %s', filename)
+                return
+            logging.debug('downloading package: %s', link)
+            r = requests.get(link, headers={'User-Agent': 'Mozilla/5.0'}, stream=True)
+            if r.ok:
+                with open(os.path.join(BUILD_DIR, filename), 'wb') as f:
+                    f.write(r.content)
+            r.close()
+
 
 if __name__ == '__main__':
     # parse the input arguments from the command line, defaults are None
@@ -105,4 +117,6 @@ if __name__ == '__main__':
     parser_install.add_argument('pkgs', nargs='+', help='name of package to install')
     parser_install.set_defaults(func=install)
     args = parser.parse_args()  # parse arguments
+    logging.debug('args: %s', args)
+    logging.debug('packages: %s', args.pkgs)
     args.func(args.pkgs)
