@@ -81,21 +81,22 @@ def search(pkgs):
 
 def install(pkgs):
     for pkg in pkgs:
-        if pkg in PKGS:
-            pyvers = [(p['machine'], p['pyversion']) for p in PKGS[pkg]]
-            logging.debug('packages:\n%s', pyvers)
-            idx = pyvers.index((MACHINE, PYVERSION))
-            link = CGOHLKE_URL + PKGS[pkg][idx]['link']
-            filename = PKGS[pkg][idx]['fullname'] + '.exe'
-            if os.path.exists(os.path.join(BUILD_DIR, filename)):
-                logging.debug('file already exists: %s', filename)
-                return
-            logging.debug('downloading package: %s', link)
-            r = requests.get(link, headers={'User-Agent': 'Mozilla/5.0'}, stream=True)
-            if r.ok:
-                with open(os.path.join(BUILD_DIR, filename), 'wb') as f:
-                    f.write(r.content)
-            r.close()
+        if pkg not in PKGS:
+            continue
+        pyvers = [(p['machine'], p['pyversion']) for p in PKGS[pkg]]
+        logging.debug('packages:\n%s', pyvers)
+        idx = pyvers.index((MACHINE, PYVERSION))
+        link = CGOHLKE_URL + PKGS[pkg][idx]['link']
+        filename = PKGS[pkg][idx]['fullname'] + '.exe'
+        if os.path.exists(os.path.join(BUILD_DIR, filename)):
+            logging.debug('file already exists: %s', filename)
+            return
+        logging.debug('downloading package: %s', link)
+        r = requests.get(link, headers={'User-Agent': 'Mozilla/5.0'}, stream=True)
+        if r.ok:
+            with open(os.path.join(BUILD_DIR, filename), 'wb') as f:
+                f.write(r.content)
+        r.close()
 
 
 if __name__ == '__main__':
