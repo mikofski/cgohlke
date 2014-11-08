@@ -1,20 +1,31 @@
 #! /usr/bin/sh
 
+# call python cgohlke.py with args
 python cgohlke.py "$@"
-PATTERN="-[0-9]\+\(\.[0-9]\+\)\+-[cpy0-9]\+-none-\(win32\|any\|win_amd64\).wh
-l"
 
-if [[ $1 == "install" && -d ~/.cgohlke ]]
-then
-    for EXE in ~/.cgohlke/*.exe
+# check for build log
+BUILD_DIR=~/.cgohlke/
+BUILD_LOG=${BUILD_DIR}cgohlke.log
+if [[ ! -f $BUILD_LOG ]]; then echo > $BUILD_LOG; fi
+
+TEST=
+
+# convert and install packages
+if [[ $1 == "install" && -d ${BUILD_DIR} ]]; then
+    shift
+    for EXE in ${BUILD_DIR}*.exe
     do
-        # TODO: check if wheel already exists
-        echo converting $EXE to wheel ...
-        wheel convert -v $EXE -d ~/.cgohlke
+        TEST=`grep $EXE $BUILD_LOG`
+        echo $TEST
+        if [[ $TEST == $EXE ]]
+        then
+            echo $EXE already converted to wheel!
+            TEST=
+        else
+            echo Converting $EXE to wheel ...
+            wheel convert -v $EXE -d ${BUILD_DIR}
+            echo $EXE >> $BUILD_LOG
+        fi
     done
-    for WHEEL in ~/.cgohlke/*.whl
-    do
-        echo installing $WHEEL ...
-        pip install $WHEEL
-    done
+    pip install --use-wheel --no-index --find-links=${BUILD_DIR} "$@"
 fi
