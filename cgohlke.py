@@ -48,28 +48,30 @@ def get_cgohlke_pkgs(cgohlke_url=CGOHLKE_URL):
     pkgs = dict.fromkeys(index)
     for item in soup.find_all('a'):
         grp = item.get('id')
-        if grp and grp in index:
-            pkgs[grp] = []
-            #print 'group: %s' % grp
-            for subitem in item.parent.find_all('a'):
-                onclick_event = subitem.get('onclick')
-                if onclick_event:
-                    pkg = {}
-                    group = subitem.parent.parent.parent.contents[0]['id']
-                    #assert group == grp
-                    fullname = subitem.string[:-4].replace(u'\u2011', '-')
-                    pkg['fullname'] = fullname
-                    name, pyversion = fullname.rsplit('-', 1)
-                    name, machine = name.rsplit('.', 1)
-                    name, version = name.rsplit('-', 1)
-                    #print 'package: %s' % pkg['fullname']
-                    pkg['name'] = name
-                    pkg['version'] = version
-                    pkg['machine'] = machine
-                    pkg['pyversion'] = pyversion
-                    encoded_link = re.match(PATTERN, onclick_event).groupdict()
-                    pkg['link'] = decode_link(encoded_link)
-                    pkgs[group].append(pkg)
+        if not grp or not grp in index:
+            continue
+        pkgs[grp] = []
+        #print 'group: %s' % grp
+        for subitem in item.parent.find_all('a'):
+            onclick_event = subitem.get('onclick')
+            if not onclick_event:
+                continue
+            pkg = {}
+            group = subitem.parent.parent.parent.contents[0]['id']
+            #assert group == grp
+            fullname = subitem.string[:-4].replace(u'\u2011', '-')
+            pkg['fullname'] = fullname
+            name, pyversion = fullname.rsplit('-', 1)
+            name, machine = name.rsplit('.', 1)
+            name, version = name.rsplit('-', 1)
+            #print 'package: %s' % pkg['fullname']
+            pkg['name'] = name
+            pkg['version'] = version
+            pkg['machine'] = machine
+            pkg['pyversion'] = pyversion
+            encoded_link = re.match(PATTERN, onclick_event).groupdict()
+            pkg['link'] = decode_link(encoded_link)
+            pkgs[group].append(pkg)
     return pkgs
 
 PKGS = get_cgohlke_pkgs()
@@ -111,9 +113,15 @@ def install(pkgs):
         r.close()
 
 
+def bashify(path):
+    path = path.replace('C:/','/c/').replace('C:\\','/c/')
+    path = path.replace('c:/','/c/').replace('c:\\','/c/').replace('\\','/')
+    return path
+
+
 def init_log(*args):
-    files = os.listdir(os.path.expanduser(BUILD_DIR))
-    pkgs = [os.path.join(BUILD_DIR, f).replace('C:/','/c/').replace('C:\\','/c/').replace('c:/','/c/').replace('c:\\','/c/').replace('\\','/') for f in files if f.endswith('.exe')]
+    files = os.listdir(BUILD_DIR)
+    pkgs = [bashify(os.path.join(BUILD_DIR, f)) for f in files if f.endswith('.exe')]
     with open(BUILD_LOG, 'w') as csvfile:
         spamwriter = csv.writer(csvfile, delimiter='\n')
         spamwriter.writerow(pkgs)
